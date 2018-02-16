@@ -7,6 +7,7 @@ full-build:
       name: dotnet
 
   deps:
+    - force: $CURRENT_BRANCH
     - vostok.clusterclient.transport.http
     - vostok.clusterclient
     - vostok.airlock.client
