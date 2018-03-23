@@ -22,30 +22,47 @@ namespace ProjectTemplate
                 {
                     configurationBuilder.AddCommandLine(args);
                     configurationBuilder.AddEnvironmentVariables();
-                    configurationBuilder.AddJsonFile("appsettings.json");
+                    configurationBuilder.AddJsonFile("hostsettings.json");
                 })
                 .ConfigureHost((context, hostConfigurator) =>
                 {
-                    var loggerConfiguration = new LoggerConfiguration().MinimumLevel.Debug();
-                    if (context.Configuration.GetSection("hostLog").GetValue<bool>("console"))
-                    {
-                        loggerConfiguration = loggerConfiguration
-                            .WriteTo.Console(outputTemplate: "{Timestamp:HH:mm:ss.fff} {Level:u3} [{Thread}] {Message:l}{NewLine}{Exception}", restrictedToMinimumLevel: LogEventLevel.Information);
-                    }
-                    var pathFormat = context.Configuration.GetSection("hostLog")["pathFormat"];
-                    if (!string.IsNullOrEmpty(pathFormat))
-                    {
-                        loggerConfiguration = loggerConfiguration
-                            .WriteTo.RollingFile(pathFormat, outputTemplate: "{Timestamp:HH:mm:ss.fff} {Level:u3} [{Thread}] {Message:l}{NewLine}{Exception}");
-                    }
-                    var hostLog = new SerilogLog(loggerConfiguration.CreateLogger());
-                    hostConfigurator.SetHostLog(hostLog);
-                })
-                .ConfigureAirlock((context, configurator) =>
-                {
-                    configurator.SetLog(context.HostingEnvironment.Log.FilterByLevel(LogLevel.Error));
+                    hostConfigurator.SetHostLog(CreateHostLog(context));
                 })
                 .Build();
+        }
+
+        private static ILog CreateHostLog(VostokHostBuilderContext context)
+        {
+            var configuration = context.Configuration.GetSection("hostLog");
+
+            var logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .ConfigureConsoleLogging(configuration)
+                .ConfigureFileLogging(configuration)
+                .CreateLogger();
+
+            return new SerilogLog(logger);
+        }
+
+        private static LoggerConfiguration ConfigureFileLogging(this LoggerConfiguration loggerConfiguration, IConfiguration configuration)
+        {
+            var pathFormat = configuration["pathFormat"];
+            return string.IsNullOrEmpty(pathFormat)
+                ? loggerConfiguration
+                : loggerConfiguration
+                    .WriteTo.RollingFile(
+                        pathFormat,
+                        outputTemplate: "{Timestamp:HH:mm:ss.fff} {Level:u3} [{Thread}] {Message:l}{NewLine}{Exception}");
+        }
+
+        private static LoggerConfiguration ConfigureConsoleLogging(this LoggerConfiguration loggerConfiguration, IConfiguration configuration)
+        {
+            return !configuration.GetValue<bool>("console")
+                ? loggerConfiguration
+                : loggerConfiguration
+                    .WriteTo.Console(
+                        outputTemplate: "{Timestamp:HH:mm:ss.fff} {Level:u3} [{Thread}] {Message:l}{NewLine}{Exception}",
+                        restrictedToMinimumLevel: LogEventLevel.Information);
         }
     }
 }
