@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using System.IO;
+using Microsoft.Extensions.Configuration;
 using Serilog;
 using Serilog.Events;
 using Vostok.Hosting;
@@ -20,9 +21,9 @@ namespace ProjectTemplate
                 .SetServiceInfo("%project%", "%service%")
                 .ConfigureAppConfiguration(configurationBuilder =>
                 {
-                    configurationBuilder.AddCommandLine(args);
                     configurationBuilder.AddEnvironmentVariables();
                     configurationBuilder.AddJsonFile("hostsettings.json");
+                    configurationBuilder.AddCommandLine(args);
                 })
                 .ConfigureHost((context, hostConfigurator) =>
                 {
@@ -38,20 +39,20 @@ namespace ProjectTemplate
             var logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .ConfigureConsoleLogging(configuration)
-                .ConfigureFileLogging(configuration)
+                .ConfigureFileLogging(configuration, context)
                 .CreateLogger();
 
             return new SerilogLog(logger);
         }
 
-        private static LoggerConfiguration ConfigureFileLogging(this LoggerConfiguration loggerConfiguration, IConfiguration configuration)
+        private static LoggerConfiguration ConfigureFileLogging(this LoggerConfiguration loggerConfiguration, IConfiguration configuration, VostokHostBuilderContext context)
         {
-            var pathFormat = configuration["pathFormat"];
-            return string.IsNullOrEmpty(pathFormat)
+            var logsDir = configuration["logsDir"];
+            return string.IsNullOrEmpty(logsDir)
                 ? loggerConfiguration
                 : loggerConfiguration
                     .WriteTo.RollingFile(
-                        pathFormat,
+                        Path.Combine(logsDir, context.HostingEnvironment.Service, "log-{Date}.log"),
                         outputTemplate: "{Timestamp:HH:mm:ss.fff} {Level:u3} [{Thread}] {Message:l}{NewLine}{Exception}");
         }
 
